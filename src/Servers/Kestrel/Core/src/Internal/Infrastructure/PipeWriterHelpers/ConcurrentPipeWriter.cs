@@ -57,6 +57,17 @@ namespace Microsoft.AspNetCore.Server.Kestrel.Core.Internal.Infrastructure.PipeW
             _innerPipeWriter = innerPipeWriter;
             _pool = pool;
             _sync = sync;
+
+            Reset();
+        }
+
+        public void Reset()
+        {
+            _head = null;
+            _tail = null;
+            _tailMemory = null;
+            _tailBytesBuffered = 0;
+            _bytesBuffered = 0;
         }
 
         public override Memory<byte> GetMemory(int sizeHint = 0)
