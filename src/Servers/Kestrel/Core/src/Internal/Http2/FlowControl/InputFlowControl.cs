@@ -29,6 +29,8 @@ namespace Microsoft.AspNetCore.Server.Kestrel.Core.Internal.Http2.FlowControl
         public void Reset()
         {
             _flow = new FlowControl((uint)_initialWindowSize);
+            _pendingUpdateSize = 0;
+            _windowUpdatesDisabled = false;
         }
 
         public bool TryAdvance(int bytes)

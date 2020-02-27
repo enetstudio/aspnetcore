@@ -3,6 +3,7 @@
 
 using System;
 using System.Buffers;
+using System.Diagnostics;
 using System.IO.Pipelines;
 using System.Runtime.CompilerServices;
 using System.Threading;
@@ -66,6 +67,10 @@ namespace Microsoft.AspNetCore.Server.Kestrel.Core.Internal.Infrastructure.PipeW
             _tailMemory = null;
             _tailBytesBuffered = 0;
             _bytesBuffered = 0;
+            _currentFlushTcs = null;
+            _bufferedWritePending = false;
+            _aborted = false;
+            _completeException = null;
         }
 
         public override Memory<byte> GetMemory(int sizeHint = 0)

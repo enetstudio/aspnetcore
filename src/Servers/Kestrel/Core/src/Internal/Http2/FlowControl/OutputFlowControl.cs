@@ -42,7 +42,7 @@ namespace Microsoft.AspNetCore.Server.Kestrel.Core.Internal.Http2.FlowControl
         public void Reset()
         {
             _flow = new FlowControl(_initialWindowSize);
-            _awaitableQueue?.Clear();
+            Debug.Assert((_awaitableQueue?.Count ?? 0) == 0, "Queue should have been emptied by the previous stream.");
         }
 
         public void Advance(int bytes)
