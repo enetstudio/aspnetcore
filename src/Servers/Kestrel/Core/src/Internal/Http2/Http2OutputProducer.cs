@@ -19,16 +19,16 @@ namespace Microsoft.AspNetCore.Server.Kestrel.Core.Internal.Http2
 {
     internal class Http2OutputProducer : IHttpOutputProducer, IHttpOutputAborter
     {
-        private int _streamId;
-        private Http2FrameWriter _frameWriter;
+        private int StreamId => _stream.StreamId;
+        private readonly Http2FrameWriter _frameWriter;
         private TimingPipeFlusher _flusher;
-        private IKestrelTrace _log;
+        private readonly IKestrelTrace _log;
 
         // This should only be accessed via the FrameWriter. The connection-level output flow control is protected by the
         // FrameWriter's connection-level write lock.
         private StreamOutputFlowControl _flowControl;
-        private MemoryPool<byte> _memoryPool;
-        private Http2Stream _stream;
+        private readonly MemoryPool<byte> _memoryPool;
+        private readonly Http2Stream _stream;
         private readonly object _dataWriterLock = new object();
         private Pipe _pipe;
         private ConcurrentPipeWriter _pipeWriter;
@@ -42,14 +42,17 @@ namespace Microsoft.AspNetCore.Server.Kestrel.Core.Internal.Http2
 
         private IMemoryOwner<byte> _fakeMemoryOwner;
 
-        public void Initialize(Http2StreamContext context, Http2Stream stream, StreamOutputFlowControl outputFlowControl)
+        public Http2OutputProducer(Http2Stream stream, Http2StreamContext context)
         {
-            _streamId = context.StreamId;
-            _frameWriter = context.FrameWriter;
-            _flowControl = outputFlowControl;
-            _memoryPool = context.MemoryPool;
             _stream = stream;
+            _frameWriter = context.FrameWriter;
+            _memoryPool = context.MemoryPool;
             _log = context.ServiceContext.Log;
+        }
+
+        public void Initialize(StreamOutputFlowControl outputFlowControl)
+        {
+            _flowControl = outputFlowControl;
 
             _streamEnded = false;
             _suffixSent = false;
@@ -151,7 +154,7 @@ namespace Microsoft.AspNetCore.Server.Kestrel.Core.Internal.Http2
                     return default;
                 }
 
-                return _frameWriter.Write100ContinueAsync(_streamId);
+                return _frameWriter.Write100ContinueAsync(StreamId);
             }
         }
 
@@ -186,7 +189,7 @@ namespace Microsoft.AspNetCore.Server.Kestrel.Core.Internal.Http2
                     http2HeadersFrame = Http2HeadersFrameFlags.NONE;
                 }
 
-                _frameWriter.WriteResponseHeaders(_streamId, statusCode, http2HeadersFrame, responseHeaders);
+                _frameWriter.WriteResponseHeaders(StreamId, statusCode, http2HeadersFrame, responseHeaders);
             }
         }
 
@@ -239,7 +242,7 @@ namespace Microsoft.AspNetCore.Server.Kestrel.Core.Internal.Http2
                 // Always send the reset even if the response body is _completed. The request body may not have completed yet.
                 Stop();
 
-                return _frameWriter.WriteRstStreamAsync(_streamId, error);
+                return _frameWriter.WriteRstStreamAsync(StreamId, error);
             }
         }
 
@@ -393,12 +396,12 @@ namespace Microsoft.AspNetCore.Server.Kestrel.Core.Internal.Http2
                         {
                             // Only flush if required (i.e. content length exceeds flow control availability)
                             // Writing remaining content without flushing allows content and trailers to be sent in the same packet
-                            await _frameWriter.WriteDataAsync(_streamId, _flowControl, readResult.Buffer, endStream: false, forceFlush: false);
+                            await _frameWriter.WriteDataAsync(StreamId, _flowControl, readResult.Buffer, endStream: false, forceFlush: false);
                         }
 
                         _stream.ResponseTrailers.SetReadOnly();
                         _stream.DecrementActiveClientStreamCount();
-                        flushResult = await _frameWriter.WriteResponseTrailers(_streamId, _stream.ResponseTrailers);
+                        flushResult = await _frameWriter.WriteResponseTrailers(StreamId, _stream.ResponseTrailers);
                     }
                     else if (readResult.IsCompleted && _streamEnded)
                     {
@@ -417,7 +420,7 @@ namespace Microsoft.AspNetCore.Server.Kestrel.Core.Internal.Http2
                         {
                             _stream.DecrementActiveClientStreamCount();
                         }
-                        flushResult = await _frameWriter.WriteDataAsync(_streamId, _flowControl, readResult.Buffer, endStream, forceFlush: true);
+                        flushResult = await _frameWriter.WriteDataAsync(StreamId, _flowControl, readResult.Buffer, endStream, forceFlush: true);
                     }
 
                     _pipeReader.AdvanceTo(readResult.Buffer.End);

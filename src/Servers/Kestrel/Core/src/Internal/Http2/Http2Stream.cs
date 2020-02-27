@@ -20,7 +20,7 @@ namespace Microsoft.AspNetCore.Server.Kestrel.Core.Internal.Http2
     internal abstract partial class Http2Stream : HttpProtocol, IThreadPoolWorkItem
     {
         private Http2StreamContext _context;
-        private readonly Http2OutputProducer _http2Output = new Http2OutputProducer();
+        private Http2OutputProducer _http2Output;
         private StreamInputFlowControl _inputFlowControl;
         private StreamOutputFlowControl _outputFlowControl;
 
@@ -43,7 +43,6 @@ namespace Microsoft.AspNetCore.Server.Kestrel.Core.Internal.Http2
             RequestBodyStarted = false;
             DrainExpirationTicks = 0;
 
-            var oldContext = _context;
             _context = context;
 
             _inputFlowControl = new StreamInputFlowControl(
@@ -57,12 +56,14 @@ namespace Microsoft.AspNetCore.Server.Kestrel.Core.Internal.Http2
                 context.ConnectionOutputFlowControl,
                 context.ClientPeerSettings.InitialWindowSize);
 
-            _http2Output.Initialize(context, this, _outputFlowControl);
-
-            if (RequestBodyPipe != null &&
-                context.ServerPeerSettings.InitialWindowSize == oldContext.ServerPeerSettings.InitialWindowSize)
+            if (_http2Output == null)
             {
-                // We can reuse the request pipe if stream's initial window size matches
+                _http2Output = new Http2OutputProducer(this, context);
+            }
+            _http2Output.Initialize(_outputFlowControl);
+
+            if (RequestBodyPipe != null)
+            {
                 RequestBodyPipe.Reset();
             }
             else

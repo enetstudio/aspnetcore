@@ -57,8 +57,6 @@ namespace Microsoft.AspNetCore.Server.Kestrel.Core.Internal.Infrastructure.PipeW
             _innerPipeWriter = innerPipeWriter;
             _pool = pool;
             _sync = sync;
-
-            Reset();
         }
 
         public void Reset()
