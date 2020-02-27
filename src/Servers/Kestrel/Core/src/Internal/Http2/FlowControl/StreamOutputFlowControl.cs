@@ -24,6 +24,11 @@ namespace Microsoft.AspNetCore.Server.Kestrel.Core.Internal.Http2.FlowControl
 
         public bool IsAborted => _connectionLevelFlowControl.IsAborted || _streamLevelFlowControl.IsAborted;
 
+        public void Reset()
+        {
+            _streamLevelFlowControl.Reset();
+        }
+
         public void Advance(int bytes)
         {
             _connectionLevelFlowControl.Advance(bytes);

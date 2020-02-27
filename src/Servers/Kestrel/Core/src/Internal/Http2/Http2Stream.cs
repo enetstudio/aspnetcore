@@ -45,36 +45,37 @@ namespace Microsoft.AspNetCore.Server.Kestrel.Core.Internal.Http2
 
             _context = context;
 
-            _inputFlowControl = new StreamInputFlowControl(
-                context.StreamId,
-                context.FrameWriter,
-                context.ConnectionInputFlowControl,
-                context.ServerPeerSettings.InitialWindowSize,
-                context.ServerPeerSettings.InitialWindowSize / 2);
-
-            _outputFlowControl = new StreamOutputFlowControl(
-                context.ConnectionOutputFlowControl,
-                context.ClientPeerSettings.InitialWindowSize);
-
-            if (_http2Output == null)
+            // First time the stream is used we need to create flow control, producer and pipes.
+            // When a stream is reused these types will be reset and reused.
+            if (_inputFlowControl == null)
             {
-                _http2Output = new Http2OutputProducer(this, context);
-            }
-            _http2Output.Initialize(_outputFlowControl);
+                _inputFlowControl = new StreamInputFlowControl(
+                    this,
+                    context.FrameWriter,
+                    context.ConnectionInputFlowControl,
+                    context.ServerPeerSettings.InitialWindowSize,
+                    context.ServerPeerSettings.InitialWindowSize / 2);
 
-            if (RequestBodyPipe != null)
-            {
-                RequestBodyPipe.Reset();
-            }
-            else
-            {
+                _outputFlowControl = new StreamOutputFlowControl(
+                    context.ConnectionOutputFlowControl,
+                    context.ClientPeerSettings.InitialWindowSize);
+
+                _http2Output = new Http2OutputProducer(this, context, _outputFlowControl);
+
                 RequestBodyPipe = CreateRequestBodyPipe(
                     context.ServerPeerSettings.InitialWindowSize,
                     context.MemoryPool,
                     ServiceContext.Scheduler);
-            }
 
-            Output = _http2Output;
+                Output = _http2Output;
+            }
+            else
+            {
+                _inputFlowControl.Reset();
+                _outputFlowControl.Reset();
+                _http2Output.StreamReset();
+                RequestBodyPipe.Reset();
+            }
         }
 
         public void InitializeWithExistingContext(int streamId)

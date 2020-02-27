@@ -21,18 +21,18 @@ namespace Microsoft.AspNetCore.Server.Kestrel.Core.Internal.Http2
     {
         private int StreamId => _stream.StreamId;
         private readonly Http2FrameWriter _frameWriter;
-        private TimingPipeFlusher _flusher;
+        private readonly TimingPipeFlusher _flusher;
         private readonly IKestrelTrace _log;
 
         // This should only be accessed via the FrameWriter. The connection-level output flow control is protected by the
         // FrameWriter's connection-level write lock.
-        private StreamOutputFlowControl _flowControl;
+        private readonly StreamOutputFlowControl _flowControl;
         private readonly MemoryPool<byte> _memoryPool;
         private readonly Http2Stream _stream;
         private readonly object _dataWriterLock = new object();
-        private Pipe _pipe;
-        private ConcurrentPipeWriter _pipeWriter;
-        private PipeReader _pipeReader;
+        private readonly Pipe _pipe;
+        private readonly ConcurrentPipeWriter _pipeWriter;
+        private readonly PipeReader _pipeReader;
         private ValueTask<FlushResult> _dataWriteProcessingTask;
         private bool _startedWritingDataFrames;
         private bool _streamCompleted;
@@ -42,18 +42,28 @@ namespace Microsoft.AspNetCore.Server.Kestrel.Core.Internal.Http2
 
         private IMemoryOwner<byte> _fakeMemoryOwner;
 
-        public Http2OutputProducer(Http2Stream stream, Http2StreamContext context)
+        public Http2OutputProducer(Http2Stream stream, Http2StreamContext context, StreamOutputFlowControl flowControl)
         {
             _stream = stream;
             _frameWriter = context.FrameWriter;
+            _flowControl = flowControl;
             _memoryPool = context.MemoryPool;
             _log = context.ServiceContext.Log;
+
+            _pipe = CreateDataPipe(_memoryPool);
+
+            _pipeWriter = new ConcurrentPipeWriter(_pipe.Writer, _memoryPool, _dataWriterLock);
+            _pipeReader = _pipe.Reader;
+
+            // No need to pass in timeoutControl here, since no minDataRates are passed to the TimingPipeFlusher.
+            // The minimum output data rate is enforced at the connection level by Http2FrameWriter.
+            _flusher = new TimingPipeFlusher(_pipeWriter, timeoutControl: null, _log);
+
+            _dataWriteProcessingTask = ProcessDataWrites();
         }
 
-        public void Initialize(StreamOutputFlowControl outputFlowControl)
+        public void StreamReset()
         {
-            _flowControl = outputFlowControl;
-
             _streamEnded = false;
             _suffixSent = false;
             _suffixSent = false;
@@ -61,22 +71,8 @@ namespace Microsoft.AspNetCore.Server.Kestrel.Core.Internal.Http2
             _streamCompleted = false;
             _writerComplete = false;
 
-            if (_pipe != null)
-            {
-                _pipe.Reset();
-                _pipeWriter.Reset();
-            }
-            else
-            {
-                _pipe = CreateDataPipe(_memoryPool);
-
-                _pipeWriter = new ConcurrentPipeWriter(_pipe.Writer, _memoryPool, _dataWriterLock);
-                _pipeReader = _pipe.Reader;
-
-                // No need to pass in timeoutControl here, since no minDataRates are passed to the TimingPipeFlusher.
-                // The minimum output data rate is enforced at the connection level by Http2FrameWriter.
-                _flusher = new TimingPipeFlusher(_pipeWriter, timeoutControl: null, _log);
-            }
+            _pipe.Reset();
+            _pipeWriter.Reset();
 
             _dataWriteProcessingTask = ProcessDataWrites();
         }

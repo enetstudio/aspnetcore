@@ -10,10 +10,12 @@ namespace Microsoft.AspNetCore.Server.Kestrel.Core.Internal.Http2.FlowControl
     {
         private FlowControl _flow;
         private Queue<OutputFlowControlAwaitable> _awaitableQueue;
+        private readonly uint _initialWindowSize;
 
         public OutputFlowControl(uint initialWindowSize)
         {
             _flow = new FlowControl(initialWindowSize);
+            _initialWindowSize = initialWindowSize;
         }
 
         public int Available => _flow.Available;
@@ -35,6 +37,12 @@ namespace Microsoft.AspNetCore.Server.Kestrel.Core.Internal.Http2.FlowControl
                 _awaitableQueue.Enqueue(awaitable);
                 return awaitable;
             }
+        }
+
+        public void Reset()
+        {
+            _flow = new FlowControl(_initialWindowSize);
+            _awaitableQueue?.Clear();
         }
 
         public void Advance(int bytes)
