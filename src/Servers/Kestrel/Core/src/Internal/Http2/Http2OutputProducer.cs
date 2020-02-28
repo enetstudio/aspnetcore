@@ -64,6 +64,8 @@ namespace Microsoft.AspNetCore.Server.Kestrel.Core.Internal.Http2
 
         public void StreamReset()
         {
+            Debug.Assert(_dataWriteProcessingTask.IsCompletedSuccessfully);
+
             _streamEnded = false;
             _suffixSent = false;
             _suffixSent = false;

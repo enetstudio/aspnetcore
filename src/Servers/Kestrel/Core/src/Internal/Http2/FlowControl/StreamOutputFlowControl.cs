@@ -27,7 +27,11 @@ namespace Microsoft.AspNetCore.Server.Kestrel.Core.Internal.Http2.FlowControl
         public void Reset()
         {
             _streamLevelFlowControl.Reset();
-            Debug.Assert(_currentConnectionLevelAwaitable == null, "Should have been completed and nulled by the previous stream.");
+            if (_currentConnectionLevelAwaitable != null)
+            {
+                Debug.Assert(_currentConnectionLevelAwaitable.IsCompleted, "Should have been completed by the previous stream.");
+                _currentConnectionLevelAwaitable = null;
+            }
         }
 
         public void Advance(int bytes)

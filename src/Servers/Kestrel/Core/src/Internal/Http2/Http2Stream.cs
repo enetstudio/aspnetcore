@@ -37,6 +37,7 @@ namespace Microsoft.AspNetCore.Server.Kestrel.Core.Internal.Http2
         {
             base.Initialize(context);
 
+            CanReuse = false;
             _decrementCalled = false;
             _completionState = StreamCompletionFlags.None;
             InputRemaining = null;
@@ -104,6 +105,8 @@ namespace Microsoft.AspNetCore.Server.Kestrel.Core.Internal.Http2
             }
         }
 
+        public bool CanReuse { get; private set; }
+
         protected override void OnReset()
         {
             _keepAlive = true;
@@ -153,6 +156,8 @@ namespace Microsoft.AspNetCore.Server.Kestrel.Core.Internal.Http2
                 // The app can no longer read any more of the request body, so return any bytes that weren't read to the
                 // connection's flow-control window.
                 _inputFlowControl.Abort();
+
+                CanReuse = !_keepAlive && _requestProcessingStatus == RequestProcessingStatus.ResponseCompleted;
 
                 Reset();
             }

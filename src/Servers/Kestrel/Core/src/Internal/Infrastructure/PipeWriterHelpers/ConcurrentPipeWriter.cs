@@ -62,13 +62,8 @@ namespace Microsoft.AspNetCore.Server.Kestrel.Core.Internal.Infrastructure.PipeW
 
         public void Reset()
         {
-            _head = null;
-            _tail = null;
-            _tailMemory = null;
-            _tailBytesBuffered = 0;
-            _bytesBuffered = 0;
-            _currentFlushTcs = null;
-            _bufferedWritePending = false;
+            Debug.Assert(_currentFlushTcs == null, "There should not be a pending flush.");
+
             _aborted = false;
             _completeException = null;
         }
