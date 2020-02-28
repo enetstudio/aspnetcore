@@ -33,9 +33,9 @@ namespace Microsoft.AspNetCore.Server.Kestrel.Core.Internal.Http2
         private StreamCompletionFlags _completionState;
         private readonly object _completionLock = new object();
 
-        public void Initialize(Http2StreamContext context)
+        public void Initialize(Http2StreamContext context, bool reset)
         {
-            base.Initialize(context);
+            base.Initialize(context, reset);
 
             _decrementCalled = false;
             _completionState = StreamCompletionFlags.None;
@@ -71,7 +71,10 @@ namespace Microsoft.AspNetCore.Server.Kestrel.Core.Internal.Http2
         public void InitializeWithExistingContext(int streamId)
         {
             _context.StreamId = streamId;
-            Initialize(_context);
+
+            // The stream was reset when it was completed.
+            // We don't want to reset it twice because reused headers will be discarded.
+            Initialize(_context, reset: false);
         }
 
         public int StreamId => _context.StreamId;

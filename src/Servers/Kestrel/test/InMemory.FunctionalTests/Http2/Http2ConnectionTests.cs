@@ -26,29 +26,27 @@ namespace Microsoft.AspNetCore.Server.Kestrel.Core.Tests
     public class Http2ConnectionTests : Http2TestBase
     {
         [Fact]
-        public async Task RequestHeaderStringReuse()
+        public async Task RequestHeaderStringReuse_MultipleStreams_KnownHeaderReused()
         {
-            IEnumerable<KeyValuePair<string, string>> grpcRequestHeaders = new[]
+            IEnumerable<KeyValuePair<string, string>> requestHeaders = new[]
             {
-                new KeyValuePair<string, string>(HeaderNames.Method, "POST"),
-                new KeyValuePair<string, string>(HeaderNames.Path, "/greeter/SayHello"),
+                new KeyValuePair<string, string>(HeaderNames.Method, "GET"),
+                new KeyValuePair<string, string>(HeaderNames.Path, "/hello"),
                 new KeyValuePair<string, string>(HeaderNames.Scheme, "http"),
                 new KeyValuePair<string, string>(HeaderNames.Authority, "localhost:80"),
-                new KeyValuePair<string, string>(HeaderNames.ContentType, "application/grpc"),
-                new KeyValuePair<string, string>("grpc-accept-encoding", "identity"),
-                new KeyValuePair<string, string>("grpc-timeout", "1S"),
+                new KeyValuePair<string, string>(HeaderNames.ContentType, "application/json")
             };
 
             await InitializeConnectionAsync(_readHeadersApplication);
 
-            await StartStreamAsync(1, grpcRequestHeaders, endStream: true);
+            await StartStreamAsync(1, requestHeaders, endStream: true);
 
             await ExpectAsync(Http2FrameType.HEADERS,
                 withLength: 55,
                 withFlags: (byte)(Http2HeadersFrameFlags.END_HEADERS | Http2HeadersFrameFlags.END_STREAM),
                 withStreamId: 1);
 
-            var stream1GrpcAcceptEncoding = _receivedHeaders["grpc-accept-encoding"];
+            var contentType1 = _receivedHeaders["Content-Type"];
 
             // Ping will trigger the stream to be returned to the pool so we can assert it
             await SendPingAsync(Http2PingFrameFlags.NONE);
@@ -60,16 +58,16 @@ namespace Microsoft.AspNetCore.Server.Kestrel.Core.Tests
             // Stream has been returned to the pool
             Assert.Equal(1, _connection.StreamPool.Count);
 
-            await StartStreamAsync(3, grpcRequestHeaders, endStream: true);
+            await StartStreamAsync(3, requestHeaders, endStream: true);
 
             await ExpectAsync(Http2FrameType.HEADERS,
                 withLength: 55,
                 withFlags: (byte)(Http2HeadersFrameFlags.END_HEADERS | Http2HeadersFrameFlags.END_STREAM),
                 withStreamId: 3);
 
-            var stream3GrpcAcceptEncoding = _receivedHeaders["grpc-accept-encoding"];
+            var contentType2 = _receivedHeaders["Content-Type"];
 
-            Assert.Same(stream1GrpcAcceptEncoding, stream3GrpcAcceptEncoding);
+            Assert.Same(contentType1, contentType2);
 
             await StopConnectionAsync(expectedLastStreamId: 3, ignoreNonGoAwayFrames: false);
         }
